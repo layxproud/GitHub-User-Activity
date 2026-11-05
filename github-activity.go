@@ -50,25 +50,35 @@ func run() error {
 	}
 	username := flag.Args()[0]
 
-	url := fmt.Sprintf("https://api.github.com/users/%s/events", url.PathEscape(username))
+	endpoint := fmt.Sprintf("https://api.github.com/users/%s/events", url.PathEscape(username))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	events, err := fetchEvents(ctx, url)
+	events, err := fetchEvents(ctx, endpoint)
 	if err != nil {
 		return err
 	}
 
+	if len(events) == 0 {
+		fmt.Println("No recent activity")
+		return nil
+	}
+
+	lines := make([]string, 0, len(events))
 	for _, e := range events {
-		fmt.Println("-", describe(e))
+		lines = append(lines, describe(e))
+	}
+
+	for _, line := range collapse(lines) {
+		fmt.Println("-", line)
 	}
 
 	return nil
 }
 
 func fetchEvents(ctx context.Context, url string) ([]Event, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -92,7 +102,7 @@ func fetchEvents(ctx context.Context, url string) ([]Event, error) {
 
 	var events []Event
 	if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
-		return nil, fmt.Errorf("decode response: %v", err)
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
 	return events, nil
@@ -150,4 +160,22 @@ func capitalize(s string) string {
 	}
 	r, size := utf8.DecodeRuneInString(s)
 	return string(unicode.ToUpper(r)) + s[size:]
+}
+
+func collapse(lines []string) []string {
+	var out []string
+	for i := 0; i < len(lines); {
+		j := i + 1
+		for j < len(lines) && lines[j] == lines[i] {
+			j++
+		}
+		if n := j - i; n > 1 {
+			out = append(out, fmt.Sprintf("%s x%d", lines[i], n))
+		} else {
+			out = append(out, lines[i])
+		}
+		i = j
+	}
+
+	return out
 }
