@@ -19,4 +19,5 @@ go run github-activity.go username
 - - ReleaseEvent
 - - ForkEvent
 - - PublicEvent
+
 Остальные события проходят через стандартный обработчик
